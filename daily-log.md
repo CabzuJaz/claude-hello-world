@@ -10,3 +10,11 @@
 - Learned: method parameters must be declared — missing `system: str` caused TypeError
 - WIN: Same Claude responded as a technical expert AND a 5-year-old using the same method
 - Tomorrow: Day 3 — Tool Use (function calling)
+
+## Day 3 — April 13, 2026
+- Built tool use script — Claude correctly decided to call get_weather('Manila')
+- Learned: tool_use stop_reason means Claude chose to call a function instead of answering
+- Learned: tool_input is a dict, access with [] not ()
+- Added retry logic with exponential backoff for 529 overload errors
+- Blocked: Anthropic servers overloaded (529) — full output test pending
+- Tomorrow: rerun tool_use.py to confirm full output, then continue Day 3
