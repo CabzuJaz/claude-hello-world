@@ -18,3 +18,13 @@
 - Added retry logic with exponential backoff for 529 overload errors
 - Blocked: Anthropic servers overloaded (529) — full output test pending
 - Tomorrow: rerun tool_use.py to confirm full output, then continue Day 3
+
+## Day 3 — April 14, 2026
+- Tool use fully working — Claude calls get_weather() for Manila and Tokyo
+- Key insight: stop_reason tells you everything:
+  - tool_use = Claude chose to call a function
+  - end_turn = Claude answered directly without tools
+- Claude correctly skipped the tool for "What is 2+2?" — it knows when NOT to use tools
+- Added retry logic for 529 overload errors
+- WIN: First real AI decision-making loop working end to end
+- Tomorrow: Day 4 — multi-turn conversations + persistent memory
