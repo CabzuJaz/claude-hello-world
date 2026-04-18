@@ -28,3 +28,11 @@
 - Added retry logic for 529 overload errors
 - WIN: First real AI decision-making loop working end to end
 - Tomorrow: Day 4 — multi-turn conversations + persistent memory
+
+## Day 4 — April 18, 2026
+- Built a CLI chatbot that remembers conversations across sessions
+- Memory saved to memory.json — persists even after terminal is closed
+- Key insight: Claude has zero memory by default — YOU are responsible 
+  for passing history back on every API call
+- WIN: Claude remembered my name, location, and goals from a previous session
+- Tomorrow: Day 5 — Node.js crash course, rewrite Day 1 in JavaScript
