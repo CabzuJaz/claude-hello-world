@@ -36,3 +36,10 @@
   for passing history back on every API call
 - WIN: Claude remembered my name, location, and goals from a previous session
 - Tomorrow: Day 5 — Node.js crash course, rewrite Day 1 in JavaScript
+
+## Day 5 — April 20, 2026
+- Rebuilt Claude chatbot in JavaScript/Node.js
+- Learned: package.json needs "type": "module" for ES import syntax
+- Learned: template literals use backticks not regular quotes for ${variables}
+- WIN: Same Claude integration now working in both Python AND JavaScript
+- Tomorrow: Day 6 — Prompt Engineering deep dive + prompt template library
