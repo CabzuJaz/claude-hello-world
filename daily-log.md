@@ -43,3 +43,10 @@
 - Learned: template literals use backticks not regular quotes for ${variables}
 - WIN: Same Claude integration now working in both Python AND JavaScript
 - Tomorrow: Day 6 — Prompt Engineering deep dive + prompt template library
+
+## Day 6 — April 20, 2026
+- Built a 10-template prompt library covering: code review, teaching, summarizing, debugging, email writing, SQL, product management, standup, data extraction, and roast reviewer
+- Key insight: system prompts are the most powerful tool in AI engineering — same Claude, completely different behavior
+- WIN: Code reviewer caught SQL injection vulnerability automatically
+- WIN: Standup bot turned raw bullet points into professional update in seconds
+- Tomorrow: Day 7 — review and polish all Week 1 repos, write proper README
