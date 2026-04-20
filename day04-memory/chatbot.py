@@ -37,7 +37,6 @@ def chat(user_input: str, history: list) -> str:
     assistant_message = response.content[0].text
     history.append({"role": "assistant", "content": assistant_message})
     save_memory(history)
-
     return assistant_message
 
 
