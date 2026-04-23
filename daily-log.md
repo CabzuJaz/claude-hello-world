@@ -50,3 +50,36 @@
 - WIN: Code reviewer caught SQL injection vulnerability automatically
 - WIN: Standup bot turned raw bullet points into professional update in seconds
 - Tomorrow: Day 7 — review and polish all Week 1 repos, write proper README
+
+## Day 7 - April 21, 2026
+- Git polishing
+
+## Day 8 — April 21, 2026 (Concepts)
+
+### What I Learned: Agents vs Chatbots
+
+**Chatbot** — reacts to one message, answers, done.
+**Agent** — given a goal, figures out the steps itself and keeps working until complete.
+
+Key difference: a chatbot reacts, an agent acts.
+
+### The ReAct Pattern (Reason + Act)
+Every agent loop looks like this:
+- REASON: "What do I need to do next?"
+- ACT: Call a tool
+- REASON: "What did I get back? Is the goal done?"
+- ACT: Call another tool OR stop
+
+### 3 Things a Research Agent Needs
+1. **Search** — get information from the web
+2. **Reason** — read results and decide: enough or need more?
+3. **Write** — save the report when done
+
+### Memory Types
+| Type | Human equivalent | Built on |
+|------|-----------------|----------|
+| In-context | What's in your head right now | Day 4 messages array |
+| External | Notes in a notebook | Day 4 memory.json |
+| Semantic | Searchable knowledge base | Week 3 |
+
+### Architecture
