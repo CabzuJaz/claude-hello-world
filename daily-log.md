@@ -83,3 +83,14 @@ Every agent loop looks like this:
 | Semantic | Searchable knowledge base | Week 3 |
 
 ### Architecture
+
+## Day 9 — April 23, 2026
+- Built first autonomous research agent
+- Claude searched 5 times across 2 iterations — decided on its own when to search more
+- Claude called write_report on iteration 3 — decided on its own when it had enough
+- Agent produced 700-word report with 8 sources saved to .md file
+- Fixed: duckduckgo-search package renamed to ddgs
+- Fixed: stop_response typo → stop_reason
+- Key insight: the agent loop + system prompt is all you need — no framework required
+- WIN: First truly autonomous AI system — goal in, report out
+- Tomorrow: Day 10 — structured output + file I/O improvements
