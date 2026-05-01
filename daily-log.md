@@ -94,3 +94,32 @@ Every agent loop looks like this:
 - Key insight: the agent loop + system prompt is all you need — no framework required
 - WIN: First truly autonomous AI system — goal in, report out
 - Tomorrow: Day 10 — structured output + file I/O improvements
+
+## Day 10 — May 1, 2026
+
+### What Was Built
+- Upgraded research agent with dual file output: saves both a `.md` report AND a `_summary.json` summary file
+- Agent autonomously searched the web, compiled 15 sources, and produced a 2,100-word report in one run
+
+### What Was Learned
+- All three layers of tool use must stay in sync: **tool schema → function signature → run_tool dispatcher**
+  - If even one is out of sync, Claude sends data your code can't handle and the message chain breaks
+- Nested objects in tool schemas confuse Claude — always flatten to top-level fields when possible
+- Dead code after `break` silently kills your agent loop — Python won't warn you
+- `max_tokens` affects the full conversation context, not just the reply — long searches eat into the budget fast
+
+### Bugs Fixed
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| `tool_use ids found without tool_result blocks` (first occurrence) | `write_report` had a nested `summary` object in the schema — Claude produced malformed tool calls | Flattened `summary` fields (`title`, `key_findings`, `sources_count`, `word_count`) to top-level schema properties |
+| `cannot use 'dict' as a set element` | Bracket mismatch during schema edit — Python misread `{...}` as a set | Rewrote entire `tools = [...]` block cleanly from scratch |
+| `tool_use ids found without tool_result blocks` (second occurrence) | `messages.append({"role": "user", ...})` was placed inside the `else` block **after** `break` — dead code, never executed | Moved `messages.append` to correct position: outside the `for` loop but inside the `elif tool_use` block |
+| `Unexpected stop_reason: max_tokens` | `max_tokens=4096` wasn't enough for multi-search context + full report generation | Increased `max_tokens` to `8096` |
+
+### WIN 🏆
+First research agent that saves structured output — goal in, `.md` report + `.json` summary out. Fully autonomous, no framework required.
+
+### What's Next
+- Day 11 — MCP concepts (read Anthropic MCP docs)
+- Day 12 — Build first MCP server
