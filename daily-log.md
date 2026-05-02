@@ -123,3 +123,28 @@ First research agent that saves structured output — goal in, `.md` report + `.
 ### What's Next
 - Day 11 — MCP concepts (read Anthropic MCP docs)
 - Day 12 — Build first MCP server
+
+## Day 12 — May 2, 2026
+
+### What Was Built
+- First MCP server (`server.py`) exposing two tools via FastMCP:
+  - `get_weather` — returns weather data for a given city
+  - `search_web` — DuckDuckGo search, reused from Day 9
+- Test client (`test_client.py`) to verify Claude reasons about MCP-exposed tools
+
+### What Was Learned
+- MCP servers use `stdio` transport — running server.py directly looks like an error but is expected behavior; it needs a client to connect
+- `FastMCP` decorator pattern `@mcp.tool()` is cleaner than manually defining tool schemas
+- Same tools from Days 3–9 can be lifted into an MCP server with minimal changes
+- MCP makes tools external and reusable — any MCP-compatible client can use them without rewriting
+
+### Bugs Fixed
+| Bug | Fix |
+|-----|-----|
+| `Invalid JSON: EOF while parsing` when running `server.py` directly | Not a bug — MCP stdio servers expect a client connection. Run `test_client.py` instead |
+
+### WIN 🏆
+Claude autonomously called `get_weather` twice for Manila and Tokyo from a single message — same behavior as Day 3, but now powered by a standalone reusable MCP server.
+
+### What's Next
+- Day 13 — MCP + SQLite (connect your MCP server to a real database)
