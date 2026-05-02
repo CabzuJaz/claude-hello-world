@@ -148,3 +148,30 @@ Claude autonomously called `get_weather` twice for Manila and Tokyo from a singl
 
 ### What's Next
 - Day 13 — MCP + SQLite (connect your MCP server to a real database)
+
+## Day 13 — May 2, 2026
+
+### What Was Built
+- MCP server (`server.py`) backed by SQLite with 4 tools:
+  - `create_table` — initializes notes table
+  - `add_note` — inserts a note with title and content
+  - `get_notes` — retrieves all notes ordered by date
+  - `search_notes` — keyword search across title and content
+- Test client (`test_client.py`) with full agent loop:
+  - Claude creates table, adds 3 notes, retrieves all, and searches — from plain English
+
+### What Was Learned
+- SQLite is built into Python — no install needed, perfect for local MCP servers
+- `conn.row_factory = sqlite3.Row` lets you access columns by name instead of index
+- MCP tools are just Python functions — any existing Python code can become an MCP tool
+- Claude can chain multiple DB operations in one instruction ("create table AND add 3 notes")
+
+### Bugs Fixed
+None — clean run on first attempt. ✅
+
+### WIN 🏆
+Claude managed a real SQLite database using plain English — no SQL written by the user.
+Full CRUD-like operations through natural language via MCP tools.
+
+### What's Next
+- Day 14 — Review + Document all Week 2 work (Days 8–13)
