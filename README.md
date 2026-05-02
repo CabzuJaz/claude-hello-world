@@ -34,3 +34,22 @@ pip install -r requirements.txt
 - `stop_reason: tool_use` means Claude chose to call a function
 - System prompts control everything about Claude's behavior
 - The gap between Python dev and AI engineer is smaller than it looks
+
+## Progress
+
+| Day | Topic | Status |
+|-----|-------|--------|
+| 1 | First Claude API Call | ✅ |
+| 2 | OOP ClaudeClient Class | ✅ |
+| 3 | Tool Use / Function Calling | ✅ |
+| 4 | Stateful Chatbot with Memory | ✅ |
+| 5 | JavaScript Chatbot (Node.js) | ✅ |
+| 6 | Prompt Template Library | ✅ |
+| 7 | GitHub Polish + READMEs | ✅ |
+| 8 | Agent Architecture (Study) | ✅ |
+| 9 | Research Agent v1 | ✅ |
+| 10 | File I/O + Structured Output | ✅ |
+| 11 | MCP Concepts (Study) | ✅ |
+| 12 | First MCP Server | ✅ |
+| 13 | MCP + SQLite | ✅ |
+| 14 | Review + Document | ✅ |
