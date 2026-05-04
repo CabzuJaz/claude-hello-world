@@ -175,3 +175,47 @@ Full CRUD-like operations through natural language via MCP tools.
 
 ### What's Next
 - Day 14 — Review + Document all Week 2 work (Days 8–13)
+
+## Day 14 — May 2, 2026
+
+### What Was Built
+- READMEs for Day 9, 10, 12, and 13 folders
+- Updated main README.md with full Week 2 progress table (Days 8–13)
+- Updated GitHub repo topics: added `mcp`, `sqlite`, `ai-engineering`, `autonomous-agents`
+
+### What Was Learned
+- Documentation is what turns a homework folder into a portfolio
+- Each README should answer: what it does, how to run it, and the key insight
+- A clean GitHub profile with pinned repos and topics gets noticed
+
+### Bugs Fixed
+None — documentation day. ✅
+
+### WIN 🏆
+Week 2 fully documented and polished. 14 days complete, repo looks professional.
+
+### What's Next
+- Day 15 — n8n Setup (workflow automation)
+
+## Day 15 — May 4, 2026
+
+### What Was Built
+- n8n installed and running locally via `npx n8n` at localhost:5678
+- First workflow: Manual Trigger → HTTP Request → GitHub API
+- Successfully fetched CabzuJaz GitHub profile data in 218ms
+
+### What Was Learned
+- n8n workflows map directly to the Python agent loop:
+  - Nodes = tools, Trigger = starting message, Workflow chain = agent loop
+- n8n passes data between nodes automatically — no manual message history needed
+- Visual workflow builders are just agent loops with a UI on top
+
+### Bugs Fixed
+None — clean setup. ✅
+
+### WIN 🏆
+First n8n workflow running — Manual Trigger → HTTP Request → real JSON data
+returned from GitHub API. Data flowing through a visual pipeline for the first time.
+
+### What's Next
+- Day 16 — AI Email Triage workflow using Claude inside n8n
