@@ -252,3 +252,28 @@ Full AI pipeline running inside a visual workflow tool.
 
 ### What's Next
 - Day 17 — Multi-Agent Concepts
+
+## Day 17 — May 7, 2026
+
+### What Was Built
+- Created `day17-multi-agent-concepts/notes.md` with structured study notes
+- Mapped out 3 core multi-agent patterns: sequential, parallel, hierarchical
+
+### What Was Learned
+- Single agent = one Claude doing everything
+- Multi-agent = multiple Claudes with specialized roles — orchestrator delegates to subagents
+- Sequential pattern: A → B → C (already built this in n8n Day 16)
+- Parallel pattern: multiple agents run simultaneously → aggregator combines results
+- Hierarchical pattern: one orchestrator manages specialized workers
+- Multi-agent solves the token limit problem — each agent has its own context window
+- Specialization produces better output than one agent doing everything
+
+### Bugs Fixed
+None — study day. ✅
+
+### WIN 🏆
+Multi-agent architecture understood — ready to build a real orchestrator + subagent
+pipeline tomorrow.
+
+### What's Next
+- Day 18 — Build Multi-Agent Pipeline v1
