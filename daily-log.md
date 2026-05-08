@@ -277,3 +277,31 @@ pipeline tomorrow.
 
 ### What's Next
 - Day 18 — Build Multi-Agent Pipeline v1
+
+## Day 18 — May 8, 2026
+
+### What Was Built
+- Hierarchical multi-agent pipeline with 3 specialized agents:
+  - Orchestrator (Sonnet) — plans subtopics, delegates tasks, saves report
+  - Search Agent (Haiku) — researches one subtopic, runs its own tool loop
+  - Writer Agent (Sonnet) — combines all findings into a structured report
+- Report auto-saved as `.md` file
+
+### What Was Learned
+- Orchestrator pattern: plan first, then delegate — never do everything in one agent
+- Different models for different jobs: Haiku for fast/cheap search, Sonnet for quality writing
+- Each subagent has its own isolated context window — solves the token limit problem
+- Sequential delegation is simpler to debug than parallel — good starting point
+- Orchestrator output (subtopic list) needs defensive parsing — Claude sometimes
+  adds extra text around numbered lists
+
+### Bugs Fixed
+None — clean run. ✅
+
+### WIN 🏆
+First true multi-agent system — orchestrator planned 3 subtopics, delegated to
+3 search agents, combined findings via writer agent, and saved a full report.
+All from one prompt.
+
+### What's Next
+- Day 19 — External API Integration
