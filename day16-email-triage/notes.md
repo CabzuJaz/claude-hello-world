@@ -27,3 +27,8 @@
 Claude autonomously triaged 4 emails — correctly flagged production outage as 
 urgent/high, newsletter as low, recruiter as spam, PR review as follow-up/medium.
 Full AI pipeline running inside a visual workflow tool.
+
+
+### Run and Test
+- in the terminal run npx n8n
+- a browser of n8n will open
