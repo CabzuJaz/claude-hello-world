@@ -336,3 +336,35 @@ and humidity. Fake data from Day 3 is now replaced with the real world.
 
 ### What's Next
 - Day 20 — Claude + n8n + MCP Together
+
+## Day 20 — May 11, 2026
+
+### What Was Built
+- Flask API server (`mcp_api_server.py`) wrapping a full Claude research agent
+- n8n workflow: Manual Trigger → Topic Input → HTTP POST to Flask → Format Output
+- Claude autonomously searched 3 times, wrote report, saved `ai_agents_trends_2026.md`
+- n8n received structured JSON result: status, topic, report_file, iterations, summary
+
+### What Was Learned
+- Flask bridges n8n and Claude — n8n can't run Python directly but can POST to any API
+- Two terminals required: one for Flask (port 5001), one for n8n (port 5678)
+- n8n can't resolve `localhost` reliably — use `127.0.0.1` explicitly
+- The full stack now works as one system: n8n triggers → Flask receives →
+  Claude reasons → tools execute → report saved → n8n displays result
+- Each layer is independently testable:
+  `/health` for Flask, browser POST test, then full n8n workflow
+
+### Bugs Fixed
+| Bug | Fix |
+|-----|-----|
+| `ModuleNotFoundError: flask` | Flask not installed in sprint venv — `pip install flask` inside venv |
+| `Connection refused` in n8n | n8n wasn't running — needed second terminal with `npx n8n` |
+| `The service refused the connection` | Changed URL from `localhost` to `127.0.0.1` in HTTP Request node |
+
+### WIN 🏆
+n8n + Flask + Claude + MCP tools running as one complete pipeline.
+Topic in → autonomous research → structured JSON result back to n8n.
+The most complete system built in the entire sprint.
+
+### What's Next
+- Day 21 — Review + Loom Video
