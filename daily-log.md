@@ -305,3 +305,34 @@ All from one prompt.
 
 ### What's Next
 - Day 19 — External API Integration
+
+## Day 19 — May 9, 2026
+
+### What Was Built
+- Weather agent connecting Claude to OpenWeatherMap's real-time API
+- Two tools exposed to Claude:
+  - `get_current_weather` — live temp, humidity, wind, conditions for any city
+  - `get_forecast` — 5-day forecast
+- Claude fetches live data and gives practical advice (umbrella, clothing, timing)
+
+### What Was Learned
+- External API integration follows the same tool use pattern as Day 3 —
+  the only difference is the tool calls a real API instead of fake data
+- OpenWeatherMap API keys take up to 2 hours to activate after signup
+- Claude gives better answers when tools return structured, readable text
+  instead of raw JSON — format the API response before returning it
+- `requests` library makes REST API calls simple: url + params + response.json()
+
+### Bugs Fixed
+| Bug | Fix |
+|-----|-----|
+| `401 Invalid API key` on first run | Key wasn't activated yet — waited ~1 hour and retried |
+| `OPENWEATHER_API_KEY` returning None | Verified .env had no spaces around = and no quotes |
+
+### WIN 🏆
+Claude answered real weather questions with live data — fetched current conditions
+for Manila and Cavite, gave practical outdoor advice based on actual temperature
+and humidity. Fake data from Day 3 is now replaced with the real world.
+
+### What's Next
+- Day 20 — Claude + n8n + MCP Together
