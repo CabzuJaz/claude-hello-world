@@ -1,0 +1,55 @@
+{
+  "name": "Day 15 - Test",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "12e9b186-5e7e-4ba3-bba7-ec075fc4fb9e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/users/CabzuJaz",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "b140a24e-72e8-4fcb-a0b6-ac8ffcb852bd",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "668e3c8d-603e-4b76-9e0d-6d60f454a1a0",
+  "meta": {
+    "instanceId": "98803a3a15c257770f1ab18be12d4183c78b10c1296ca08eb204637d5012cecb"
+  },
+  "id": "E9wcmgVe6cOvro07",
+  "tags": []
+}

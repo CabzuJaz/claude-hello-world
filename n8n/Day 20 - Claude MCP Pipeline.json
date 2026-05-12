@@ -1,0 +1,107 @@
+{
+  "name": "Day 20 - Claude MCP Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "79a900cc-3b62-424e-9eb0-b25039c29983",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    topic: \"Latest trends in AI agents 2026\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "6b7ca3f4-1f1a-489f-9738-1c51dd970aee",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5001/research",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"topic\": \"{{ $json.topic }}\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "049d5989-30e8-437d-826d-e47bf11a0deb",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.item.json;\n\nreturn [{\n  json: {\n    status: result.status,\n    topic: result.topic,\n    report_file: result.report_file,\n    iterations: result.iterations,\n    summary: result.summary?.substring(0, 500) + \"...\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "f6095cfc-ae92-43c9-9367-862095c6390b",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3a916969-a9fc-4ae1-9d50-e126f9007d1e",
+  "meta": {
+    "instanceId": "98803a3a15c257770f1ab18be12d4183c78b10c1296ca08eb204637d5012cecb"
+  },
+  "id": "ml90y7iTpty8UDvA",
+  "tags": []
+}
