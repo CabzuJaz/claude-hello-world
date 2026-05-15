@@ -368,3 +368,33 @@ The most complete system built in the entire sprint.
 
 ### What's Next
 - Day 21 — Review + Loom Video
+
+## Day 23 — May 14, 2026
+
+### What Was Built
+- Flask app scaffold with 3 routes: `/`, `/api/search`, `/api/leads`
+- SQLite database with deduplication — never saves same company twice
+- Google Sheets integration — live sync via gspread service account
+- Test suite confirming all 3 layers work together
+
+### What Was Learned
+- `gspread.authorize()` removed in newer versions — use `gspread.Client(auth=creds)` instead
+- Python venvs are version-specific — 3.9 venv must be deleted and recreated for 3.11
+- `fetchone()` not `fetchnote()` — typos in DB queries fail silently until runtime
+- Google Sheets service account needs Editor access on the specific sheet
+- `client_email` in credentials JSON is what you share the Google Sheet with
+
+### Bugs Fixed
+| Bug | Fix |
+|-----|-----|
+| `'tuple' object has no attribute 'fetchnote'` | Typo — fixed to `fetchone()` |
+| `module 'gspread' has no attribute 'authorized'` | Replaced with `gspread.Client(auth=creds)` |
+| `No module named app` | Was running from wrong directory |
+| Python 3.9 FutureWarnings | Upgraded to Python 3.11, recreated venv |
+
+### WIN 🏆
+All 3 layers working together — SQLite saved a lead, Google Sheets
+synced it in real time. Infrastructure is solid. Ready to plug in Claude.
+
+### What's Next
+- Day 24 — Build search agent + enrich agent
