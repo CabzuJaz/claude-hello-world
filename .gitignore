@@ -3,3 +3,4 @@ venv/
 __pycache__/
 *.pycgoogle_credentials.json
 google_credentials.json
+day23-str-lead-agent/leads.db
