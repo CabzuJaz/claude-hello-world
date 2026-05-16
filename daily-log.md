@@ -398,3 +398,33 @@ synced it in real time. Infrastructure is solid. Ready to plug in Claude.
 
 ### What's Next
 - Day 24 — Build search agent + enrich agent
+
+## Day 24 — Search Agent + Enrich Agent
+
+### What Was Built
+- search_agent() — finds STR companies via DuckDuckGo tool use
+- enrich_agent() — visits each website, extracts public contact info
+- Full pipeline: search → enrich → SQLite → Google Sheets
+
+### What Was Learned
+- while True with no iteration cap = runaway API loop
+- Token cost lives at the function level, not just pipeline level
+- Google Sheets append_row misfires horizontally — use update() with explicit row index
+- DB schema errors before agents = free. Errors after = already paid.
+
+### Bugs Fixed
+
+| Bug | Before | After |
+|-----|--------|-------|
+| Infinite loop | `while True:` | `for _ in range(5):` |
+| Horizontal Sheets append | `sheet.append_row(row)` | `sheet.update(f"A{next_row}", [row])` |
+| Duplicate imports | 2x save_lead, 2x append_lead | Single consolidated imports |
+| Em dash syntax error | `—` in sheets.py | Fixed via sed |
+| Page content too large | `text[:3000]` | `text[:1500]` |
+
+### WIN 🎉
+Caught a $2+ runaway loop, diagnosed it from the Anthropic console graph,
+and fixed it in 3 lines. Real production instinct.
+
+### Next
+Day 25 — Orchestrator agent
