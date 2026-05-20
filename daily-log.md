@@ -428,3 +428,31 @@ and fixed it in 3 lines. Real production instinct.
 
 ### Next
 Day 25 — Orchestrator agent
+
+## Day 25 — Orchestrator Agent
+
+### What Was Built
+- orchestrator_agent() — validates input, runs pipeline, summarizes results
+- 1 Sonnet call for summary — no tools, no loop
+- enrich_agent system prompt fixed — fetch once, return immediately
+- Email filter relaxed — saves all leads, warns if no email
+
+### What Was Learned
+- System prompt wording directly controls agent loop behavior
+- "fetch once" instruction stops multi-page crawling completely
+- Strict email filter = 0 leads saved — warn and save is better
+- Location specificity matters for search quality (philippines → Manila Philippines)
+
+### Bugs Fixed
+
+| Bug | Before | After |
+|-----|--------|-------|
+| Enrich agent multi-page crawl | No fetch limit in system prompt | "Call fetch_page ONCE… do not follow links" |
+| Email filter too strict | `continue` on no email | Warn + save, count no_email_count |
+
+### WIN 🎉
+Loop fix confirmed — search agent now runs in exactly 2 API calls.
+Token count controlled and predictable.
+
+### Next
+Day 26 — Frontend UI (form + results table)
