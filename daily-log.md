@@ -456,3 +456,29 @@ Token count controlled and predictable.
 
 ### Next
 Day 26 — Frontend UI (form + results table)
+
+## Day 26 — Frontend UI + Enrich Improvements
+
+### What Was Built
+- Full dark UI — form, stats row, results table, agent summary box
+- Flask /api/search now calls orchestrator_agent() — no more test data
+- extract_social_links() — pulls social hrefs before stripping
+- extract_contact_links() — pulls mailto: and tel: hrefs before stripping
+- fetch_contact_page() — Python finds and fetches /contact page automatically
+- EMAIL_REGEX + PHONE_REGEX — scans full page text before 800 char truncation
+
+### What Was Learned
+- Social/email links live in hrefs, not page text — must extract before stripping
+- 800 char limit cuts off footer — regex on full text solves it
+- JS-rendered sites (React/Next.js) return empty HTML via requests
+- requests.get() can never see JS-rendered content — confirmed via False False test
+
+### Known Limitation
+- JS-rendered sites (e.g. MyCleanBnb) — contact info not capturable
+- Fix: Playwright headless browser — deferred to Day 28
+
+### WIN 🎉
+6 leads captured, 5 with contact info, UI live at localhost:5002
+
+### Next
+Day 27 — Activity log + real-time progress
