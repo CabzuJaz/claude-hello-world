@@ -93,10 +93,10 @@ def search_agent(location: str, property_type: str, max_results: int = 5) -> lis
 
     messages = [{
         "role": "user",
-        "content": f"""Search for {max_results} short-term rental property management
-companies in {location} that manage {property_type} properties.
+        "content": f"""Search for short-term rental property management companies
+in {location} that manage {property_type} properties.
 
-Return results as a JSON list:
+Call search_web once, then return results as a JSON list:
 [
   {{
     "company_name": "Company Name",
@@ -105,15 +105,16 @@ Return results as a JSON list:
   }}
 ]
 
-Include ALL companies found in search results.
+Return up to {max_results} companies from the search results.
 Return ONLY the JSON list, no extra text."""
     }]
 
-    system = """You are a lead research specialist. Search for STR property
-management companies and return structured JSON data only.
-Never invent companies — only return real ones found in search results."""
+    system = """You are a lead research specialist.
+Call search_web ONCE. Then immediately return whatever companies you found as a JSON list.
+Do not search again. Do not look for more results.
+Return structured JSON data only. Never invent companies."""
 
-    for _ in range(5):
+    for _ in range(3):
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=2048,
@@ -122,7 +123,6 @@ Never invent companies — only return real ones found in search results."""
             messages=messages
         )
 
-        #To check token usage for debugging
         print(f"  [Tokens] in={response.usage.input_tokens} out={response.usage.output_tokens}")
 
         messages.append({"role": "assistant", "content": response.content})
@@ -169,11 +169,15 @@ Never invent companies — only return real ones found in search results."""
 # ─────────────────────────────────────────
 
 def enrich_agent(company: dict) -> dict:
-    """Visits company website and extracts public contact info."""
+    """Visits company website and extracts public contact info + social media."""
     print(f"\n[Enrich Agent] Enriching: {company['company_name']}")
 
-    # ✅ FIX 2 — default contact defined upfront
-    default_contact = {"email": None, "phone": None, "linkedin_url": None}
+    default_contact = {
+        "email": None,
+        "phone": None,
+        "linkedin_url": None,
+        "social_media": None
+    }
 
     messages = [{
         "role": "user",
@@ -184,18 +188,24 @@ Return a JSON object with this exact format:
 {{
   "email": "contact@example.com or null",
   "phone": "+1 555 0000 or null",
-  "linkedin_url": "https://linkedin.com/company/... or null"
+  "linkedin_url": "https://linkedin.com/company/... or null",
+  "social_media": "https://instagram.com/... or null"
 }}
 
-Only include information that is publicly listed on their website.
+For social_media, return the first social media profile found (Instagram preferred,
+then Facebook, then Twitter/X). Return the full URL.
+Only include information publicly listed on their website.
 Return ONLY the JSON object, no extra text."""
     }]
 
-    system = """You are a data enrichment specialist. Visit company websites
-and extract only publicly listed contact information.
+    # ✅ FIX — fetch once, return immediately, no multi-page crawling
+    system = """You are a data enrichment specialist.
+Call fetch_page ONCE on the main website URL given.
+Then immediately return whatever contact info you found as a JSON object.
+Do not fetch additional pages. Do not follow links.
 Never guess or invent contact details."""
 
-    for _ in range(5):
+    for _ in range(3):
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
@@ -204,7 +214,6 @@ Never guess or invent contact details."""
             messages=messages
         )
 
-        #To check token usage for debugging
         print(f"  [Tokens] in={response.usage.input_tokens} out={response.usage.output_tokens}")
 
         messages.append({"role": "assistant", "content": response.content})
@@ -218,8 +227,9 @@ Never guess or invent contact details."""
                         end = text.rfind("}") + 1
                         if start != -1 and end > start:
                             contact = json.loads(text[start:end])
-                            print(f"  Email: {contact.get('email')}")
-                            print(f"  Phone: {contact.get('phone')}")
+                            print(f"  Email       : {contact.get('email')}")
+                            print(f"  Phone       : {contact.get('phone')}")
+                            print(f"  Social Media: {contact.get('social_media')}")
                             return contact
                         else:
                             print("[Enrich Agent] No JSON object found")
@@ -246,16 +256,74 @@ Never guess or invent contact details."""
     return default_contact
 
 # ─────────────────────────────────────────
+# ORCHESTRATOR AGENT
+# ─────────────────────────────────────────
+
+def orchestrator_agent(location: str, property_type: str, max_results: int = 5) -> dict:
+    """Validates input, runs pipeline, summarizes results. 1 Sonnet call, no tools, no loop."""
+    print(f"\n[Orchestrator] Starting — {location} | {property_type} | max {max_results}")
+
+    # Input validation — no API call
+    if not location or not location.strip():
+        return {"status": "error", "message": "Location is required.", "leads": []}
+    if not property_type or not property_type.strip():
+        return {"status": "error", "message": "Property type is required.", "leads": []}
+    if max_results < 1 or max_results > 10:
+        return {"status": "error", "message": "max_results must be between 1 and 10.", "leads": []}
+
+    # Run pipeline
+    leads = run_pipeline(location.strip(), property_type.strip(), max_results)
+
+    if not leads:
+        return {"status": "done", "message": "No leads found.", "leads": []}
+
+    # Summarize results — 1 Sonnet call, no tools
+    leads_text = "\n".join([
+        f"- {l.get('company_name')} | {l.get('website')} | "
+        f"{l.get('email') or 'no email'} | "
+        f"{l.get('phone') or 'no phone'} | "
+        f"{l.get('social_media') or 'no social'}"
+        for l in leads
+    ])
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=512,
+        system="You are a lead research assistant. Write concise pipeline summaries.",
+        messages=[{
+            "role": "user",
+            "content": f"""Summarize these STR leads found in {location} for {property_type} properties in 2-3 sentences.
+Note how many had contact info vs none.
+
+{leads_text}"""
+        }]
+    )
+
+    print(f"  [Orchestrator Tokens] in={response.usage.input_tokens} out={response.usage.output_tokens}")
+
+    summary = response.content[0].text if response.content else "Pipeline complete."
+    print(f"\n[Orchestrator] Summary: {summary}")
+
+    return {
+        "status": "done",
+        "location": location,
+        "property_type": property_type,
+        "leads_found": len(leads),
+        "summary": summary,
+        "leads": leads
+    }
+
+# ─────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────
+
 def run_pipeline(location: str, property_type: str, max_results: int = 5) -> list:
-    """Full pipeline: search → enrich → save."""
+    """Full pipeline: search → enrich → save. Saves all leads, warns if no email."""
     print(f"\n{'='*50}")
     print(f"STR Lead Agent Starting")
     print(f"Location: {location} | Type: {property_type}")
     print(f"{'='*50}")
 
-    # Always initialize DB first before anything else
     init_db()
     ensure_headers()
 
@@ -266,39 +334,59 @@ def run_pipeline(location: str, property_type: str, max_results: int = 5) -> lis
         return []
 
     saved_leads = []
+    no_email_count = 0
+
     for company in companies:
         contact = enrich_agent(company)
+
+        # ✅ FIX — warn but save all leads regardless of email
+        if not contact.get("email"):
+            print(f"  [Pipeline] Warning: {company['company_name']} — no email found, saving anyway")
+            no_email_count += 1
+
         lead = {**company, **contact}
 
-        save_lead(
-            company_name=lead.get("company_name"),
-            website=lead.get("website"),
-            email=lead.get("email"),
-            phone=lead.get("phone"),
-            linkedin_url=lead.get("linkedin_url"),
-            location=lead.get("location"),
-            source="DuckDuckGo search"
-        )
+        try:
+            save_lead(
+                company_name=lead.get("company_name"),
+                website=lead.get("website"),
+                email=lead.get("email"),
+                phone=lead.get("phone"),
+                linkedin_url=lead.get("linkedin_url"),
+                social_media=lead.get("social_media"),
+                location=lead.get("location"),
+                source="DuckDuckGo search"
+            )
+        except Exception as e:
+            print(f"[Pipeline] DB error — lead NOT saved to SQLite: {e}")
 
-        append_lead(
-            company_name=lead.get("company_name"),
-            website=lead.get("website"),
-            email=lead.get("email"),
-            phone=lead.get("phone"),
-            linkedin_url=lead.get("linkedin_url"),
-            location=lead.get("location"),
-            source="DuckDuckGo search"
-        )
+        try:
+            append_lead(
+                company_name=lead.get("company_name"),
+                website=lead.get("website"),
+                email=lead.get("email"),
+                phone=lead.get("phone"),
+                linkedin_url=lead.get("linkedin_url"),
+                social_media=lead.get("social_media"),
+                location=lead.get("location"),
+                source="DuckDuckGo search"
+            )
+        except Exception as e:
+            print(f"[Pipeline] Sheets error — lead NOT saved to Sheets: {e}")
 
         saved_leads.append(lead)
 
     print(f"\n{'='*50}")
-    print(f"Done — {len(saved_leads)} leads saved")
+    print(f"Done — {len(saved_leads)} leads saved | {no_email_count} without email")
     print(f"{'='*50}")
     return saved_leads
+
 
 if __name__ == "__main__":
     location = input("Enter location: ")
     property_type = input("Enter property type (e.g. vacation rental): ")
-    max_results = int(input("Max results (e.g. 5): "))
-    run_pipeline(location, property_type, max_results)
+    max_results = int(input("Max results (1-10): "))
+    result = orchestrator_agent(location, property_type, max_results)
+    print(f"\nStatus  : {result['status']}")
+    print(f"Found   : {result.get('leads_found', 0)} leads")
+    print(f"Summary : {result.get('summary', '')}")

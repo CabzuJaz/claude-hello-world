@@ -11,7 +11,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-HEADERS = ["Company", "Website", "Email", "Phone", "LinkedIn", "Location", "Found Via", "Date"]
+HEADERS = ["Company", "Website", "Email", "Phone", "LinkedIn", "Social Media", "Location", "Found Via", "Date"]
 
 def get_sheet():
     """Connect to Google Sheets."""
@@ -22,7 +22,7 @@ def get_sheet():
     return client.open(SHEET_NAME).sheet1
 
 def ensure_headers():
-    """Check if headers exist in row 1 - add them if missing."""
+    """Check if headers exist in row 1 — add them if missing."""
     try:
         sheet = get_sheet()
         first_row = sheet.row_values(1)
@@ -34,18 +34,25 @@ def ensure_headers():
     except Exception as e:
         print(f"[Sheets] Error checking headers: {e}")
 
-def append_lead(company_name: str, website: str = None, email: str = None,
-                phone: str = None, linkedin_url: str = None,
-                location: str = None, source: str = None):
-    """Append one lead row to Google Sheets - never overwrites headers."""
+def append_lead(
+    company_name: str,
+    website: str = None,
+    email: str = None,
+    phone: str = None,
+    linkedin_url: str = None,
+    social_media: str = None,
+    location: str = None,
+    source: str = None
+):
+    """Append one lead row to Google Sheets — never overwrites headers."""
     try:
         sheet = get_sheet()
 
-        # ✅ Safety check - ensure headers are in row 1 before appending
+        # Safety check — ensure headers are in row 1 before appending
         first_row = sheet.row_values(1)
         if first_row != HEADERS:
             sheet.insert_row(HEADERS, 1)
-            print("[Sheets] Headers were missing - added.")
+            print("[Sheets] Headers were missing — added.")
 
         row = [
             company_name or "",
@@ -53,10 +60,12 @@ def append_lead(company_name: str, website: str = None, email: str = None,
             email or "",
             phone or "",
             linkedin_url or "",
+            social_media or "",
             location or "",
             source or "",
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ]
+
         next_row = len(sheet.get_all_values()) + 1
         sheet.update(f"A{next_row}", [row])
         print(f"[Sheets] Appended: {company_name}")
@@ -64,13 +73,12 @@ def append_lead(company_name: str, website: str = None, email: str = None,
         print(f"[Sheets] Error appending lead: {e}")
 
 def clear_sheet():
-    """Clear all data except headers - for testing only."""
+    """Clear all data except headers — for testing only."""
     try:
         sheet = get_sheet()
-        # ✅ Delete all rows after row 1 - keeps headers intact
         all_values = sheet.get_all_values()
         if len(all_values) > 1:
             sheet.delete_rows(2, len(all_values))
-        print("[Sheets] Sheet cleared - headers preserved.")
+        print("[Sheets] Sheet cleared — headers preserved.")
     except Exception as e:
-        print(f"[Sheets] Error clearing sheet: {e}")
+        print(f"[Sheets] Error clearing sheet: {e}")    

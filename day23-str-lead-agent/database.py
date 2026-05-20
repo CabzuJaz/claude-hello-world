@@ -1,145 +1,103 @@
 import sqlite3
-from datetime import datetime
 import os
+from datetime import datetime
 
-# ✅ Save directly to day23-str-lead-agent folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "leads.db")
 
 def init_db():
-    """
-    Check if leads table exists.
-    If yes — rename it to leads_YYYYMMDD then create fresh leads table.
-    If no — create fresh leads table.
-    """
+    """Archive existing leads table and create a fresh one on every run."""
     conn = sqlite3.connect(DB_PATH)
-
     try:
-        # Check if leads table exists
-        existing = conn.execute("""
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name='leads'
-        """).fetchone()
+        cursor = conn.cursor()
 
-        if existing:
-            # Archive with date only
-            timestamp = datetime.now().strftime("%Y%m%d")
-            archive_name = f"leads_{timestamp}"
+        # Check if leads table already exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='leads'")
+        exists = cursor.fetchone()
 
-            # Check if archive name already exists — add suffix if it does
-            archive_exists = conn.execute(f"""
-                SELECT name FROM sqlite_master 
-                WHERE type='table' AND name='{archive_name}'
-            """).fetchone()
+        if exists:
+            # Archive with today's date
+            archive_name = f"leads_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            cursor.execute(f"ALTER TABLE leads RENAME TO {archive_name}")
+            print(f"[DB] Archived existing table as '{archive_name}'")
 
-            if archive_exists:
-                archive_name = f"{archive_name}_v2"
-
-            conn.execute(f"ALTER TABLE leads RENAME TO {archive_name}")
-            conn.commit()
-            print(f"[DB] Existing table archived as: {archive_name}")
-
-        else:
-            print("[DB] No existing table found — creating fresh.")
-
-        # ✅ Always create new leads table after archiving
-        conn.execute("""
+        # Create fresh leads table with social_media column
+        cursor.execute("""
             CREATE TABLE leads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 company_name TEXT NOT NULL,
-                website TEXT,
-                email TEXT,
-                phone TEXT,
+                website     TEXT,
+                email       TEXT,
+                phone       TEXT,
                 linkedin_url TEXT,
-                location TEXT,
-                source TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                social_media TEXT,
+                location    TEXT,
+                source      TEXT,
+                created_at  TEXT
             )
         """)
-        conn.commit()
-        print(f"[DB] New leads table created at: {DB_PATH}")
 
-    except Exception as e:
-        print(f"[DB] Error during init: {e}")
-        conn.rollback()
+        conn.commit()
+        print("[DB] Fresh leads table created.")
     finally:
         conn.close()
 
-def save_lead(company_name: str, website: str = None, email: str = None,
-              phone: str = None, linkedin_url: str = None,
-              location: str = None, source: str = None) -> int:
-    """Save a lead to SQLite. Returns the new lead ID."""
+def save_lead(
+    company_name: str,
+    website: str = None,
+    email: str = None,
+    phone: str = None,
+    linkedin_url: str = None,
+    social_media: str = None,
+    location: str = None,
+    source: str = None
+):
+    """Insert a lead — skips if company_name + location already exists."""
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-
     try:
-        # Deduplicate — don't save same company twice
-        existing = conn.execute(
+        cursor = conn.cursor()
+
+        # Deduplicate by company_name + location
+        cursor.execute(
             "SELECT id FROM leads WHERE company_name = ? AND location = ?",
             (company_name, location)
-        ).fetchone()
+        )
+        if cursor.fetchone():
+            print(f"[DB] Duplicate skipped: {company_name} in {location}")
+            return
 
-        if existing:
-            print(f"[DB] Skipped duplicate: {company_name}")
-            return existing["id"]
-
-        cursor = conn.execute("""
-            INSERT INTO leads (company_name, website, email, phone,
-                              linkedin_url, location, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (company_name, website, email, phone, linkedin_url, location, source))
+        cursor.execute("""
+            INSERT INTO leads
+                (company_name, website, email, phone, linkedin_url, social_media, location, source, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_name,
+            website,
+            email,
+            phone,
+            linkedin_url,
+            social_media,
+            location,
+            source,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
 
         conn.commit()
-        lead_id = cursor.lastrowid
-        print(f"[DB] Saved: {company_name} (ID: {lead_id})")
-        return lead_id
-
+        print(f"[DB] Saved: {company_name}")
     except Exception as e:
-        print(f"[DB] Error saving lead: {e}")
-        conn.rollback()
-        return -1
+        print(f"[DB] Save failed for {company_name}: {e}")
+        raise
     finally:
         conn.close()
 
 def get_all_leads() -> list:
-    """Fetch all leads from current leads table."""
+    """Return all leads as a list of dicts."""
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
     try:
-        rows = conn.execute(
-            "SELECT * FROM leads ORDER BY created_at DESC"
-        ).fetchall()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM leads ORDER BY created_at DESC")
+        rows = cursor.fetchall()
         return [dict(row) for row in rows]
-    except Exception as e:
-        print(f"[DB] Error fetching leads: {e}")
-        return []
-    finally:
-        conn.close()
-
-def get_archived_tables() -> list:
-    """List all archived lead tables."""
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        rows = conn.execute("""
-            SELECT name FROM sqlite_master
-            WHERE type='table' AND name LIKE 'leads_%'
-            ORDER BY name DESC
-        """).fetchall()
-        return [row[0] for row in rows]
-    except Exception as e:
-        print(f"[DB] Error fetching archives: {e}")
-        return []
-    finally:
-        conn.close()
-
-def clear_leads():
-    """Clear all leads from current table — for testing only."""
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        conn.execute("DELETE FROM leads")
-        conn.commit()
-        print("[DB] All leads cleared.")
-    except Exception as e:
-        print(f"[DB] Error clearing leads: {e}")
     finally:
         conn.close()
