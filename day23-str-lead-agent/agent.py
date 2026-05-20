@@ -1,5 +1,6 @@
 import anthropic
 import os
+import re
 import json
 import requests
 from bs4 import BeautifulSoup
@@ -11,6 +12,13 @@ from sheets import append_lead, ensure_headers
 load_dotenv()
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+# ─────────────────────────────────────────
+# REGEX PATTERNS
+# ─────────────────────────────────────────
+
+EMAIL_REGEX = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+PHONE_REGEX = re.compile(r'\+?[\d][\d\s\-().]{6,14}[\d]')
 
 # ─────────────────────────────────────────
 # TOOLS
@@ -46,6 +54,104 @@ enrich_tools = [
 ]
 
 # ─────────────────────────────────────────
+# LINK EXTRACTORS
+# ─────────────────────────────────────────
+
+SOCIAL_PATTERNS = [
+    "instagram.com",
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "linkedin.com",
+    "tiktok.com"
+]
+
+CONTACT_PATHS = [
+    "/contact",
+    "/contact-us",
+    "/get-in-touch",
+    "/about",
+    "/about-us"
+]
+
+def extract_social_links(soup) -> list:
+    """Pull social media URLs from <a href> tags before any stripping."""
+    found = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if any(pattern in href for pattern in SOCIAL_PATTERNS):
+            if href not in found:
+                found.append(href)
+    return found
+
+def extract_contact_links(soup) -> tuple:
+    """Pull emails and phones from mailto:/tel: href attributes before any stripping."""
+    emails = []
+    phones = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if href.startswith("mailto:"):
+            email = href.replace("mailto:", "").split("?")[0].strip()
+            if email and email not in emails:
+                emails.append(email)
+        elif href.startswith("tel:"):
+            phone = href.replace("tel:", "").strip()
+            if phone and phone not in phones:
+                phones.append(phone)
+    return emails, phones
+
+def fetch_contact_page(base_url: str, soup) -> str:
+    """Find and fetch the contact page — deterministic Python logic, not Claude-driven."""
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        href_lower = href.lower()
+
+        if any(path in href_lower for path in CONTACT_PATHS):
+            if href.startswith("http"):
+                contact_url = href
+            else:
+                base = base_url.rstrip("/")
+                contact_url = base + ("" if href.startswith("/") else "/") + href
+
+            print(f"  [fetch_contact_page] {contact_url}")
+            try:
+                headers = {"User-Agent": "Mozilla/5.0"}
+                r = requests.get(contact_url, headers=headers, timeout=10)
+                s = BeautifulSoup(r.text, "html.parser")
+
+                # Extract links from contact page too
+                contact_emails, contact_phones = extract_contact_links(s)
+                contact_socials = extract_social_links(s)
+
+                for tag in s(["script", "style"]):
+                    tag.decompose()
+
+                full = s.get_text(separator=" ", strip=True)
+
+                # Regex scan contact page full text
+                regex_emails = EMAIL_REGEX.findall(full)
+                regex_phones = PHONE_REGEX.findall(full)
+
+                all_emails = list(dict.fromkeys(contact_emails + regex_emails))
+                all_phones = list(dict.fromkeys(contact_phones + regex_phones))
+
+                text = full[:800]
+
+                if all_emails:
+                    text += "\n\nEMAILS FOUND: " + " | ".join(all_emails)
+                if all_phones:
+                    text += "\n\nPHONES FOUND: " + " | ".join(all_phones)
+                if contact_socials:
+                    text += "\n\nSOCIAL LINKS FOUND: " + " | ".join(contact_socials)
+
+                return text
+            except Exception as e:
+                print(f"  [fetch_contact_page] Error: {e}")
+                return ""
+
+    return ""
+
+# ─────────────────────────────────────────
 # TOOL HANDLERS
 # ─────────────────────────────────────────
 
@@ -69,10 +175,42 @@ def fetch_page(url: str) -> str:
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer"]):
+
+        # ✅ Extract from hrefs BEFORE stripping
+        social_links   = extract_social_links(soup)
+        emails, phones = extract_contact_links(soup)
+
+        for tag in soup(["script", "style"]):
             tag.decompose()
-        text = soup.get_text(separator=" ", strip=True)
-        return text[:1000]
+
+        # ✅ Regex scan FULL text before truncating — catches plain text footer
+        full_text    = soup.get_text(separator=" ", strip=True)
+        regex_emails = EMAIL_REGEX.findall(full_text)
+        regex_phones = PHONE_REGEX.findall(full_text)
+
+        # Merge href + regex, deduplicate
+        all_emails = list(dict.fromkeys(emails + regex_emails))
+        all_phones = list(dict.fromkeys(phones + regex_phones))
+
+        main_text = full_text[:800]
+
+        # ✅ Always check contact page
+        contact_text = fetch_contact_page(url, soup)
+
+        # Build combined context for Claude
+        combined = main_text
+
+        if contact_text:
+            combined += "\n\nCONTACT PAGE:\n" + contact_text
+        if all_emails:
+            combined += "\n\nEMAILS FOUND: " + " | ".join(all_emails)
+        if all_phones:
+            combined += "\n\nPHONES FOUND: " + " | ".join(all_phones)
+        if social_links:
+            combined += "\n\nSOCIAL LINKS FOUND: " + " | ".join(social_links)
+
+        return combined
+
     except Exception as e:
         return f"Fetch error: {e}"
 
@@ -189,19 +327,23 @@ Return a JSON object with this exact format:
   "email": "contact@example.com or null",
   "phone": "+1 555 0000 or null",
   "linkedin_url": "https://linkedin.com/company/... or null",
-  "social_media": "https://instagram.com/... or null"
+  "social_media": "https://instagram.com/... or https://facebook.com/... or null"
 }}
 
-For social_media, return the first social media profile found (Instagram preferred,
-then Facebook, then Twitter/X). Return the full URL.
+The page content will include these sections — use them directly:
+- EMAILS FOUND: use the first email listed
+- PHONES FOUND: use the first phone listed
+- CONTACT PAGE: additional contact info from their contact page
+- SOCIAL LINKS FOUND: use for social_media (prefer Instagram, then Facebook, then Twitter/X, then TikTok)
+
 Only include information publicly listed on their website.
 Return ONLY the JSON object, no extra text."""
     }]
 
-    # ✅ FIX — fetch once, return immediately, no multi-page crawling
     system = """You are a data enrichment specialist.
 Call fetch_page ONCE on the main website URL given.
-Then immediately return whatever contact info you found as a JSON object.
+The result includes homepage text, contact page content, and extracted links.
+Return whatever contact info you found as a JSON object immediately.
 Do not fetch additional pages. Do not follow links.
 Never guess or invent contact details."""
 
@@ -263,7 +405,6 @@ def orchestrator_agent(location: str, property_type: str, max_results: int = 5) 
     """Validates input, runs pipeline, summarizes results. 1 Sonnet call, no tools, no loop."""
     print(f"\n[Orchestrator] Starting — {location} | {property_type} | max {max_results}")
 
-    # Input validation — no API call
     if not location or not location.strip():
         return {"status": "error", "message": "Location is required.", "leads": []}
     if not property_type or not property_type.strip():
@@ -271,13 +412,11 @@ def orchestrator_agent(location: str, property_type: str, max_results: int = 5) 
     if max_results < 1 or max_results > 10:
         return {"status": "error", "message": "max_results must be between 1 and 10.", "leads": []}
 
-    # Run pipeline
     leads = run_pipeline(location.strip(), property_type.strip(), max_results)
 
     if not leads:
         return {"status": "done", "message": "No leads found.", "leads": []}
 
-    # Summarize results — 1 Sonnet call, no tools
     leads_text = "\n".join([
         f"- {l.get('company_name')} | {l.get('website')} | "
         f"{l.get('email') or 'no email'} | "
@@ -339,7 +478,6 @@ def run_pipeline(location: str, property_type: str, max_results: int = 5) -> lis
     for company in companies:
         contact = enrich_agent(company)
 
-        # ✅ FIX — warn but save all leads regardless of email
         if not contact.get("email"):
             print(f"  [Pipeline] Warning: {company['company_name']} — no email found, saving anyway")
             no_email_count += 1
