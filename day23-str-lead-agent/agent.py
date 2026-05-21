@@ -9,10 +9,19 @@ from ddgs import DDGS
 from dotenv import load_dotenv
 from database import save_lead, init_db
 from sheets import append_lead, ensure_headers
+from config import (
+    ANTHROPIC_API_KEY,
+    REQUEST_TIMEOUT,
+    MAX_RESULTS_LIMIT,
+    validate_config
+)
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# ✅ Validate config on import — fails fast with clear message
+validate_config()
+
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # ─────────────────────────────────────────
 # REGEX PATTERNS
@@ -154,7 +163,7 @@ def fetch_contact_page(base_url: str, soup) -> str:
 
             print(f"  [fetch_contact_page] {contact_url}")
             try:
-                r = requests.get(contact_url, headers=req_headers, timeout=10)
+                r = requests.get(contact_url, headers=req_headers, timeout=REQUEST_TIMEOUT)
                 if r.status_code == 200:
                     s = BeautifulSoup(r.text, "html.parser")
                     return _scrape_contact_soup(s)
@@ -166,7 +175,7 @@ def fetch_contact_page(base_url: str, soup) -> str:
     for path in ["/contact-us/", "/contact-us", "/contact/", "/contact"]:
         try:
             contact_url = base + path
-            r = requests.get(contact_url, headers=req_headers, timeout=8)
+            r = requests.get(contact_url, headers=req_headers, timeout=REQUEST_TIMEOUT)
             if r.status_code == 200 and len(r.text) > 500:
                 print(f"  [fetch_contact_page] Fallback hit: {contact_url}")
                 s = BeautifulSoup(r.text, "html.parser")
@@ -182,6 +191,8 @@ def fetch_contact_page(base_url: str, soup) -> str:
 
 def search_web(query: str, max_results: int = 5) -> str:
     print(f"  [search_web] '{query}'")
+    # ✅ Cap max_results to limit
+    max_results = min(max_results, MAX_RESULTS_LIMIT)
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
@@ -198,30 +209,25 @@ def fetch_page(url: str) -> str:
     print(f"  [fetch_page] '{url}'")
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # ✅ Extract from hrefs BEFORE stripping
         social_links   = extract_social_links(soup)
         emails, phones = extract_contact_links(soup)
 
         for tag in soup(["script", "style"]):
             tag.decompose()
 
-        # ✅ unescape HTML entities — catches &#64; → @
         raw_text  = soup.get_text(separator=" ", strip=True)
         full_text = html.unescape(raw_text)
 
-        # ✅ Regex scan FULL unescaped text before truncating
         regex_emails = EMAIL_REGEX.findall(full_text)
         regex_phones = PHONE_REGEX.findall(full_text)
 
         all_emails = list(dict.fromkeys(emails + regex_emails))
         all_phones = list(dict.fromkeys(phones + regex_phones))
 
-        main_text = full_text[:800]
-
-        # ✅ Contact page — link follow + fallback paths
+        main_text    = full_text[:800]
         contact_text = fetch_contact_page(url, soup)
 
         combined = main_text
@@ -431,12 +437,13 @@ def orchestrator_agent(location: str, property_type: str, max_results: int = 5) 
     """Validates input, runs pipeline, summarizes results. 1 Sonnet call, no tools, no loop."""
     print(f"\n[Orchestrator] Starting — {location} | {property_type} | max {max_results}")
 
+    # ✅ Input validation
     if not location or not location.strip():
         return {"status": "error", "message": "Location is required.", "leads": []}
     if not property_type or not property_type.strip():
         return {"status": "error", "message": "Property type is required.", "leads": []}
-    if max_results < 1 or max_results > 10:
-        return {"status": "error", "message": "max_results must be between 1 and 10.", "leads": []}
+    if max_results < 1 or max_results > MAX_RESULTS_LIMIT:
+        return {"status": "error", "message": f"max_results must be between 1 and {MAX_RESULTS_LIMIT}.", "leads": []}
 
     leads = run_pipeline(location.strip(), property_type.strip(), max_results)
 
@@ -547,9 +554,9 @@ def run_pipeline(location: str, property_type: str, max_results: int = 5) -> lis
 
 
 if __name__ == "__main__":
-    location = input("Enter location: ")
+    location      = input("Enter location: ")
     property_type = input("Enter property type (e.g. vacation rental): ")
-    max_results = int(input("Max results (1-10): "))
+    max_results   = int(input(f"Max results (1-{MAX_RESULTS_LIMIT}): "))
     result = orchestrator_agent(location, property_type, max_results)
     print(f"\nStatus  : {result['status']}")
     print(f"Found   : {result.get('leads_found', 0)} leads")

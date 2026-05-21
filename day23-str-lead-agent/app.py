@@ -1,27 +1,30 @@
 from flask import Flask, jsonify, request, render_template_string, Response, stream_with_context
 from database import init_db, get_all_leads
 from agent import orchestrator_agent
+from config import FLASK_PORT, FLASK_DEBUG, MAX_RESULTS_LIMIT, validate_config
 from datetime import datetime
 import queue
 import threading
 import sys
+import html as html_lib
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1MB request limit
 
 # ─────────────────────────────────────────
 # GLOBAL STATE — single-user sprint tool
 # ─────────────────────────────────────────
 
-_log_queue   = queue.Queue()
-_result      = {}
-_is_running  = False
+_log_queue  = queue.Queue()
+_result     = {}
+_is_running = False
 
 
 class StreamCapture:
     """Captures print() output → log queue + terminal."""
     def __init__(self, q):
-        self.q        = q
-        self._stdout  = sys.__stdout__
+        self.q       = q
+        self._stdout = sys.__stdout__
     def write(self, text):
         self._stdout.write(text)
         if text.strip():
@@ -42,10 +45,18 @@ def _run_agent(location, property_type, max_results):
         _result = result
     except Exception as e:
         _result = {"status": "error", "message": str(e), "leads": []}
+        print(f"[Agent] Fatal error: {e}")
     finally:
         sys.stdout  = old_stdout
-        _is_running = False
-        _log_queue.put(("done", ""))   # sentinel
+        _is_running = False          # ✅ always reset — even on crash
+        _log_queue.put(("done", ""))
+
+
+def _sanitize(value: str, max_len: int = 200) -> str:
+    """Strip, truncate, and escape HTML entities to prevent XSS."""
+    if not value:
+        return ""
+    return html_lib.escape(str(value).strip()[:max_len])
 
 
 # ─────────────────────────────────────────
@@ -81,16 +92,12 @@ HTML = """
     min-height: 100vh; padding: 48px 24px;
   }
   .wrap { max-width: 960px; margin: 0 auto; }
-
-  /* Header */
   .header { margin-bottom: 40px; }
   .header h1 {
     font-size: 28px; font-weight: 600; letter-spacing: -0.5px;
     color: var(--accent); font-family: var(--mono);
   }
   .header p { color: var(--subtext); margin-top: 6px; font-size: 13px; }
-
-  /* Card */
   .card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 24px; margin-bottom: 24px;
@@ -119,12 +126,9 @@ HTML = """
   }
   .btn:hover { opacity: .85; }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
-
-  /* Activity log */
   .log-wrap {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); margin-bottom: 24px; overflow: hidden;
-    display: none;
+    border-radius: var(--radius); margin-bottom: 24px; overflow: hidden; display: none;
   }
   .log-wrap.visible { display: block; }
   .log-header {
@@ -143,21 +147,15 @@ HTML = """
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--accent); animation: pulse 1s ease-in-out infinite;
   }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; } 50% { opacity: .3; }
-  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
   .log-body {
     font-family: var(--mono); font-size: 11px; color: #666;
-    padding: 12px 16px; max-height: 240px; overflow-y: auto;
-    line-height: 1.8;
+    padding: 12px 16px; max-height: 240px; overflow-y: auto; line-height: 1.8;
   }
   .log-line { display: block; }
   .log-line .ts { color: var(--muted); margin-right: 8px; }
   .log-line.highlight { color: var(--accent); }
   .log-line.warn { color: #f0a500; }
-  .log-line.done { color: var(--accent); font-weight: 500; }
-
-  /* Summary */
   .summary-box {
     display: none; background: rgba(200,241,53,.05);
     border: 1px solid rgba(200,241,53,.2); border-radius: var(--radius);
@@ -169,8 +167,6 @@ HTML = """
     font-family: var(--mono); font-size: 10px; color: var(--accent);
     text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px;
   }
-
-  /* Stats */
   .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 24px; }
   .stat {
     background: var(--surface); border: 1px solid var(--border);
@@ -178,8 +174,6 @@ HTML = """
   }
   .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 500; color: var(--accent); }
   .stat-label { font-size: 11px; color: var(--subtext); text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
-
-  /* Table */
   .table-wrap {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden;
@@ -218,6 +212,12 @@ HTML = """
   a { color: var(--accent); text-decoration: none; font-family: var(--mono); font-size: 11px; }
   a:hover { text-decoration: underline; }
   .empty { padding: 48px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .err-msg {
+    color: var(--danger); font-family: var(--mono); font-size: 12px;
+    padding: 10px 14px; border: 1px solid var(--danger);
+    border-radius: var(--radius); margin-bottom: 16px; display: none;
+  }
+  .err-msg.visible { display: block; }
 </style>
 </head>
 <body>
@@ -228,16 +228,19 @@ HTML = """
     <p>Find short-term rental property management companies by location.</p>
   </div>
 
+  <!-- Error message -->
+  <div class="err-msg" id="err-msg"></div>
+
   <!-- Form -->
   <div class="card">
     <div class="form-grid">
       <div class="field">
         <label>Location</label>
-        <input type="text" id="location" placeholder="e.g. Gold Coast, Australia"/>
+        <input type="text" id="location" placeholder="e.g. Gold Coast, Australia" maxlength="100"/>
       </div>
       <div class="field">
         <label>Property Type</label>
-        <input type="text" id="property_type" placeholder="e.g. vacation rental"/>
+        <input type="text" id="property_type" placeholder="e.g. vacation rental" maxlength="100"/>
       </div>
       <div class="field">
         <label>Max</label>
@@ -306,17 +309,21 @@ HTML = """
 <script>
   let es = null;
 
+  function showError(msg) {
+    const el = document.getElementById('err-msg');
+    el.innerText = msg;
+    el.className = 'err-msg visible';
+    setTimeout(() => el.className = 'err-msg', 5000);
+  }
+
   function appendLog(msg) {
     const body = document.getElementById('log-body');
     const line = document.createElement('span');
-    line.className = 'log-line';
-
-    const now = new Date().toTimeString().slice(0,8);
+    const now  = new Date().toTimeString().slice(0,8);
     let cls = '';
     if (msg.includes('Done') || msg.includes('Saved') || msg.includes('Found')) cls = 'highlight';
-    if (msg.includes('Warning') || msg.includes('Skipping'))  cls = 'warn';
-    if (msg.includes('==='))  return;   // skip divider lines
-
+    if (msg.includes('Warning') || msg.includes('Skipping')) cls = 'warn';
+    if (msg.includes('===')) return;
     line.className = 'log-line ' + cls;
     line.innerHTML = `<span class="ts">${now}</span>${msg}`;
     body.appendChild(line);
@@ -328,26 +335,25 @@ HTML = """
     const property_type = document.getElementById('property_type').value.trim();
     const max_results   = parseInt(document.getElementById('max_results').value) || 5;
 
-    if (!location)      { alert('Please enter a location'); return; }
-    if (!property_type) { alert('Please enter a property type'); return; }
+    if (!location)      { showError('Please enter a location'); return; }
+    if (!property_type) { showError('Please enter a property type'); return; }
+    if (max_results < 1 || max_results > 10) { showError('Max results must be between 1 and 10'); return; }
 
-    // Reset UI
     const btn = document.getElementById('search-btn');
     btn.disabled  = true;
     btn.innerText = 'Running...';
+
     document.getElementById('log-body').innerHTML = '';
     document.getElementById('log-wrap').className = 'log-wrap visible';
     document.getElementById('log-pulse').style.display = 'block';
     document.getElementById('log-status-text').innerText = 'Running...';
     document.getElementById('summary-box').className = 'summary-box';
+    document.getElementById('err-msg').className = 'err-msg';
 
-    // Open SSE stream FIRST
     if (es) es.close();
     es = new EventSource('/api/stream');
 
-    es.addEventListener('log', e => {
-      appendLog(e.data);
-    });
+    es.addEventListener('log', e => appendLog(e.data));
 
     es.addEventListener('done', e => {
       es.close();
@@ -356,8 +362,11 @@ HTML = """
       btn.disabled  = false;
       btn.innerText = 'Run Agent';
 
-      // Fetch final result
       fetch('/api/result').then(r => r.json()).then(data => {
+        if (data.status === 'error') {
+          showError(data.message || 'Agent error — check terminal');
+          return;
+        }
         if (data.summary) {
           document.getElementById('summary-text').innerText = data.summary;
           document.getElementById('summary-box').className = 'summary-box visible';
@@ -368,17 +377,24 @@ HTML = """
     });
 
     es.onerror = () => {
-      document.getElementById('log-status-text').innerText = 'Error';
+      document.getElementById('log-status-text').innerText = 'Connection lost';
       btn.disabled  = false;
       btn.innerText = 'Run Agent';
     };
 
-    // Start search
-    await fetch('/api/search', {
+    const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ location, property_type, max_results })
     });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Search failed — check terminal');
+      btn.disabled  = false;
+      btn.innerText = 'Run Agent';
+      if (es) es.close();
+    }
   }
 
   async function loadLeads() {
@@ -399,16 +415,31 @@ HTML = """
     document.getElementById('stat-social').innerText = withSocial;
     document.getElementById('stats').style.display   = 'grid';
 
-    tbody.innerHTML = leads.map(l => `
-      <tr>
-        <td title="${l.company_name}">${l.company_name}</td>
-        <td>${l.website ? `<a href="${l.website}" target="_blank">↗ visit</a>` : '<span class="tag none">—</span>'}</td>
-        <td>${l.email    ? `<span class="tag">${l.email}</span>`    : '<span class="tag none">—</span>'}</td>
-        <td>${l.phone    ? `<span class="tag">${l.phone}</span>`    : '<span class="tag none">—</span>'}</td>
-        <td>${l.social_media ? `<a href="${l.social_media}" target="_blank">↗ social</a>` : '<span class="tag none">—</span>'}</td>
-        <td title="${l.location}">${l.location}</td>
-      </tr>
-    `).join('');
+    // ✅ textContent prevents XSS — never use innerHTML with user data
+    tbody.innerHTML = '';
+    leads.forEach(l => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td title="${esc(l.company_name)}">${esc(l.company_name)}</td>
+        <td>${l.website ? `<a href="${esc(l.website)}" target="_blank" rel="noopener noreferrer">↗ visit</a>` : '<span class="tag none">—</span>'}</td>
+        <td>${l.email    ? `<span class="tag">${esc(l.email)}</span>`    : '<span class="tag none">—</span>'}</td>
+        <td>${l.phone    ? `<span class="tag">${esc(l.phone)}</span>`    : '<span class="tag none">—</span>'}</td>
+        <td>${l.social_media ? `<a href="${esc(l.social_media)}" target="_blank" rel="noopener noreferrer">↗ social</a>` : '<span class="tag none">—</span>'}</td>
+        <td title="${esc(l.location)}">${esc(l.location)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ✅ Client-side HTML escape — prevents XSS in table
+  function esc(s) {
+    if (!s) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   loadLeads();
@@ -431,22 +462,30 @@ def search():
     global _log_queue, _result, _is_running
 
     if _is_running:
-        return jsonify({"error": "Agent already running"}), 429
+        return jsonify({"error": "Agent already running — wait for it to finish"}), 429
 
-    data          = request.get_json()
-    location      = data.get("location", "").strip()
-    property_type = data.get("property_type", "short-term rental").strip()
-    max_results   = min(int(data.get("max_results", 5)), 10)
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON body"}), 400
+
+    # ✅ Sanitize all inputs
+    location      = _sanitize(data.get("location", ""))
+    property_type = _sanitize(data.get("property_type", "short-term rental"))
+    max_results   = int(data.get("max_results", 5))
 
     if not location:
         return jsonify({"error": "location is required"}), 400
+    if not property_type:
+        return jsonify({"error": "property_type is required"}), 400
+
+    # ✅ Cap max_results
+    max_results = max(1, min(max_results, MAX_RESULTS_LIMIT))
 
     # Clear queue
     while not _log_queue.empty():
         try: _log_queue.get_nowait()
         except: break
 
-    # Run agent in background thread
     t = threading.Thread(
         target=_run_agent,
         args=(location, property_type, max_results),
@@ -469,7 +508,6 @@ def stream():
                     yield "event: done\ndata: done\n\n"
                     break
                 else:
-                    # Escape newlines for SSE
                     safe = data.replace("\n", " ")
                     yield f"event: log\ndata: {safe}\n\n"
             except queue.Empty:
@@ -478,10 +516,7 @@ def stream():
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
-        }
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
 
 
@@ -497,12 +532,45 @@ def leads():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
+    return jsonify({
+        "status": "ok",
+        "agent_running": _is_running,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+# ─────────────────────────────────────────
+# ERROR HANDLERS
+# ─────────────────────────────────────────
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Not found"}), 404
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return jsonify({"error": "Method not allowed"}), 405
+
+@app.errorhandler(413)
+def request_too_large(e):
+    return jsonify({"error": "Request body too large (max 1MB)"}), 413
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return jsonify({"error": "Agent already running"}), 429
+
+@app.errorhandler(500)
+def internal_error(e):
+    return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
+    validate_config()
     init_db()
-    print("STR Lead Agent running at http://localhost:5002")
-    # threaded=True required for SSE + concurrent requests
-    # use_reloader=False prevents double-thread issues
-    app.run(port=5002, debug=True, threaded=True, use_reloader=False)
+    print(f"STR Lead Agent running at http://localhost:{FLASK_PORT}")
+    app.run(
+        port=FLASK_PORT,
+        debug=FLASK_DEBUG,
+        threaded=True,
+        use_reloader=False
+    )

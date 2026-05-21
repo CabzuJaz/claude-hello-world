@@ -1,22 +1,22 @@
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import os
-
-CREDENTIALS_FILE = "/Users/jazzminsicat-cabizares/30-Day-Claude-Sprint/claude-hello-world/google_credentials.json"
-SHEET_NAME = "STR Leads"
+from config import GOOGLE_CREDENTIALS_FILE, SHEET_NAME
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
-HEADERS = ["Company", "Website", "Email", "Phone", "LinkedIn", "Social Media", "Location", "Found Via", "Date"]
+HEADERS = [
+    "Company", "Website", "Email", "Phone",
+    "LinkedIn", "Social Media", "Location", "Found Via", "Date"
+]
 
 def get_sheet():
     """Connect to Google Sheets."""
     creds = Credentials.from_service_account_file(
-        CREDENTIALS_FILE, scopes=SCOPES
+        GOOGLE_CREDENTIALS_FILE, scopes=SCOPES
     )
     client = gspread.Client(auth=creds)
     return client.open(SHEET_NAME).sheet1
@@ -81,4 +81,4 @@ def clear_sheet():
             sheet.delete_rows(2, len(all_values))
         print("[Sheets] Sheet cleared — headers preserved.")
     except Exception as e:
-        print(f"[Sheets] Error clearing sheet: {e}")    
+        print(f"[Sheets] Error clearing sheet: {e}")
