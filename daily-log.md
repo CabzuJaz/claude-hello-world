@@ -519,3 +519,30 @@ and save appears in real time. Looks and feels like a real product.
 
 ### Next
 Day 28 — Security + config + error handling
+
+## Day 28 — Security + Config + Error Handling
+
+### What Was Built
+- config.py — single source of truth for all env config
+- validate_config() — fails fast on startup if API key or credentials missing
+- _sanitize() — strips, truncates, escapes all user inputs in app.py
+- esc() — client-side JS escape function prevents XSS in results table
+- MAX_CONTENT_LENGTH — 1MB request body limit on Flask
+- _is_running reset in finally block — survives agent crashes
+- FLASK_PORT, FLASK_DEBUG, REQUEST_TIMEOUT, MAX_RESULTS_LIMIT — all env-controlled
+- Flask error handlers — 404, 405, 413, 429, 500
+- rel="noopener noreferrer" on all external links
+- .env.example — documents all required and optional keys
+- sheets.py — CREDENTIALS_FILE and SHEET_NAME from config, no hardcoded paths
+
+### What Was Learned
+- Hardcoded credentials file paths break on any other machine
+- _is_running must reset in finally — not just on success
+- XSS prevention needs both server-side (html.escape) and client-side (esc())
+- validate_config() on import means you know immediately, not mid-run
+
+### WIN 🎉
+Production-ready config and security. Any new machine just needs .env filled in.
+
+### Next
+Day 29 — Final polish + README
