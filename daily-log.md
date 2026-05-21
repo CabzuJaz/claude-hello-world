@@ -482,3 +482,40 @@ Day 26 — Frontend UI (form + results table)
 
 ### Next
 Day 27 — Activity log + real-time progress
+
+## Day 27 — Activity Log + Real-Time Progress + Enrich Fixes
+
+### What Was Built
+- SSE (Server-Sent Events) streaming — every print() line streams live to browser
+- Activity log panel — timestamps, color-coded, auto-scroll
+- Background thread — /api/search returns immediately, agent runs async
+- /api/stream — SSE endpoint with keepalive
+- /api/result — returns final result after agent completes
+- _scrape_contact_soup() — shared helper, no duplicate logic
+- Contact page fallback — tries /contact-us/, /contact/ directly if no nav link found
+- html.unescape() — catches &#64; encoded emails before regex scan
+
+### What Was Learned
+- SSE requires threaded=True + use_reloader=False in Flask
+- stdout capture via sys.stdout = StreamCapture(queue) intercepts all print()
+- Some sites encode @ as &#64; to block scrapers — html.unescape() fixes it
+- Some sites don't link their contact page from homepage — fallback paths needed
+- True False True = plain HTML, not JS-rendered, but contact page not linked
+
+### Bugs Fixed
+
+| Bug | Before | After |
+|-----|--------|-------|
+| Encoded emails (&#64;) | Regex missed them | html.unescape() before scan |
+| Contact page not linked | fetch_contact_page() returned "" | Fallback tries common paths directly |
+| Duplicate scrape logic | Copy-pasted code | _scrape_contact_soup() shared helper |
+
+### Known Limitation
+- JS-rendered sites (MyCleanBnb) — Playwright needed, deferred to Day 28
+
+### WIN 🎉
+Agent runs stream live to browser. Every fetch, token count,
+and save appears in real time. Looks and feels like a real product.
+
+### Next
+Day 28 — Security + config + error handling
