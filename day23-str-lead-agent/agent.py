@@ -1,6 +1,7 @@
 import anthropic
 import os
 import re
+import html
 import json
 import requests
 from bs4 import BeautifulSoup
@@ -63,12 +64,15 @@ SOCIAL_PATTERNS = [
     "twitter.com",
     "x.com",
     "linkedin.com",
-    "tiktok.com"
+    "tiktok.com",
+    "pinterest.com"
 ]
 
 CONTACT_PATHS = [
     "/contact",
     "/contact-us",
+    "/contact/",
+    "/contact-us/",
     "/get-in-touch",
     "/about",
     "/about-us"
@@ -100,8 +104,43 @@ def extract_contact_links(soup) -> tuple:
                 phones.append(phone)
     return emails, phones
 
+def _scrape_contact_soup(s) -> str:
+    """Shared helper — scrape contact info from a BeautifulSoup object."""
+    contact_emails, contact_phones = extract_contact_links(s)
+    contact_socials = extract_social_links(s)
+
+    for tag in s(["script", "style"]):
+        tag.decompose()
+
+    raw  = s.get_text(separator=" ", strip=True)
+    full = html.unescape(raw)
+
+    regex_emails = EMAIL_REGEX.findall(full)
+    regex_phones = PHONE_REGEX.findall(full)
+
+    all_emails = list(dict.fromkeys(contact_emails + regex_emails))
+    all_phones = list(dict.fromkeys(contact_phones + regex_phones))
+
+    text = full[:800]
+
+    if all_emails:
+        text += "\n\nEMAILS FOUND: " + " | ".join(all_emails)
+    if all_phones:
+        text += "\n\nPHONES FOUND: " + " | ".join(all_phones)
+    if contact_socials:
+        text += "\n\nSOCIAL LINKS FOUND: " + " | ".join(contact_socials)
+
+    return text
+
 def fetch_contact_page(base_url: str, soup) -> str:
-    """Find and fetch the contact page — deterministic Python logic, not Claude-driven."""
+    """
+    Find and fetch the contact page.
+    Strategy 1 — follow link found on page.
+    Strategy 2 — fallback: try common contact paths directly.
+    """
+    req_headers = {"User-Agent": "Mozilla/5.0"}
+
+    # ── Strategy 1: follow link found on homepage ──
     for a in soup.find_all("a", href=True):
         href = a["href"].strip()
         href_lower = href.lower()
@@ -115,39 +154,25 @@ def fetch_contact_page(base_url: str, soup) -> str:
 
             print(f"  [fetch_contact_page] {contact_url}")
             try:
-                headers = {"User-Agent": "Mozilla/5.0"}
-                r = requests.get(contact_url, headers=headers, timeout=10)
-                s = BeautifulSoup(r.text, "html.parser")
-
-                # Extract links from contact page too
-                contact_emails, contact_phones = extract_contact_links(s)
-                contact_socials = extract_social_links(s)
-
-                for tag in s(["script", "style"]):
-                    tag.decompose()
-
-                full = s.get_text(separator=" ", strip=True)
-
-                # Regex scan contact page full text
-                regex_emails = EMAIL_REGEX.findall(full)
-                regex_phones = PHONE_REGEX.findall(full)
-
-                all_emails = list(dict.fromkeys(contact_emails + regex_emails))
-                all_phones = list(dict.fromkeys(contact_phones + regex_phones))
-
-                text = full[:800]
-
-                if all_emails:
-                    text += "\n\nEMAILS FOUND: " + " | ".join(all_emails)
-                if all_phones:
-                    text += "\n\nPHONES FOUND: " + " | ".join(all_phones)
-                if contact_socials:
-                    text += "\n\nSOCIAL LINKS FOUND: " + " | ".join(contact_socials)
-
-                return text
+                r = requests.get(contact_url, headers=req_headers, timeout=10)
+                if r.status_code == 200:
+                    s = BeautifulSoup(r.text, "html.parser")
+                    return _scrape_contact_soup(s)
             except Exception as e:
                 print(f"  [fetch_contact_page] Error: {e}")
-                return ""
+
+    # ── Strategy 2: fallback — try common paths directly ──
+    base = base_url.rstrip("/").split("?")[0]
+    for path in ["/contact-us/", "/contact-us", "/contact/", "/contact"]:
+        try:
+            contact_url = base + path
+            r = requests.get(contact_url, headers=req_headers, timeout=8)
+            if r.status_code == 200 and len(r.text) > 500:
+                print(f"  [fetch_contact_page] Fallback hit: {contact_url}")
+                s = BeautifulSoup(r.text, "html.parser")
+                return _scrape_contact_soup(s)
+        except Exception:
+            continue
 
     return ""
 
@@ -183,21 +208,22 @@ def fetch_page(url: str) -> str:
         for tag in soup(["script", "style"]):
             tag.decompose()
 
-        # ✅ Regex scan FULL text before truncating — catches plain text footer
-        full_text    = soup.get_text(separator=" ", strip=True)
+        # ✅ unescape HTML entities — catches &#64; → @
+        raw_text  = soup.get_text(separator=" ", strip=True)
+        full_text = html.unescape(raw_text)
+
+        # ✅ Regex scan FULL unescaped text before truncating
         regex_emails = EMAIL_REGEX.findall(full_text)
         regex_phones = PHONE_REGEX.findall(full_text)
 
-        # Merge href + regex, deduplicate
         all_emails = list(dict.fromkeys(emails + regex_emails))
         all_phones = list(dict.fromkeys(phones + regex_phones))
 
         main_text = full_text[:800]
 
-        # ✅ Always check contact page
+        # ✅ Contact page — link follow + fallback paths
         contact_text = fetch_contact_page(url, soup)
 
-        # Build combined context for Claude
         combined = main_text
 
         if contact_text:
@@ -472,7 +498,7 @@ def run_pipeline(location: str, property_type: str, max_results: int = 5) -> lis
         print("[Pipeline] No companies found.")
         return []
 
-    saved_leads = []
+    saved_leads    = []
     no_email_count = 0
 
     for company in companies:
