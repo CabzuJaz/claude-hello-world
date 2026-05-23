@@ -5,7 +5,4 @@ __pycache__/
 google_credentials.json
 day23-str-lead-agent/leads.db.env
 leads.db
-__pycache__/
 *.pyc
-venv/
-google_credentials.json
