@@ -546,3 +546,36 @@ Production-ready config and security. Any new machine just needs .env filled in.
 
 ### Next
 Day 29 — Final polish + README
+
+## Day 30 — Ship + Loom Demo
+
+### What Was Shipped
+- Final clean test run — Sydney, Australia, vacation rental
+- requirements.txt frozen
+- Root README + capstone README pushed to GitHub
+- Loom demo recorded
+- LinkedIn + Facebook posts written and scheduled
+- Canva video frame designed for social
+
+### Sprint Complete
+
+30 days. 30 projects. One capstone.
+
+Started with a single API call.
+Shipped a multi-agent STR lead research pipeline with:
+- Live web frontend
+- Real-time SSE activity log
+- SQLite + Google Sheets sync
+- Multi-strategy contact extraction
+- Orchestrator + Search + Enrich agents
+- Security, config, error handling
+
+### WIN 🎉
+Built something real that solves a real problem.
+$0.007 per run. Apollo charges $0.50 per contact.
+Combined with Apollo + n8n = a legitimate product.
+
+### What's Next
+- Day 31 — Apollo API + n8n outreach integration (optional)
+- Polish capstone for portfolio
+- Start pitching the tool to STR operators
